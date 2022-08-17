@@ -5,10 +5,11 @@ from pymongo import MongoClient
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, Update, Bot
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, Filters, Dispatcher
 import json
+import os
 
 # fill in bot token and mongoDB uri
-TOKEN = ""
-MONGO_URI = ""
+TOKEN = os.environ['TOKEN']
+MONGO_URI = os.environ['MONGO_URI']
 
 bot = Bot(token=TOKEN)
 dispatcher = Dispatcher(bot, None, use_context=True)
@@ -28,10 +29,12 @@ list_school = [
 "Lee Kong Chian School of Business",
 "Li Ka Shing Library",
 "School of Accountancy",
-"School of Economics/School of Social Sciences",
-"School of Computing & Information Systems",
-"Yong Pung How School of Law/Kwa Geok Choo Law Library",
-"SMU Connexion"]
+"School of Computing & Information Systems 1",
+"School of Economics/School of Computing & Information Systems 2",
+"School of Social Sciences/College of Integrative Studies",
+"SMU Connexion",
+"Yong Pung How School of Law/Kwa Geok Choo Law Library"
+]
 types_facilities = [
 "Classroom",
 "Group Study Room",
@@ -45,8 +48,9 @@ school_shortcut = {"Administration Building": "Admin",
 "Lee Kong Chian School of Business": "LKCSB",
 "Li Ka Shing Library": "LKSLIB",
 "School of Accountancy": "SOA",
-"School of Economics/School of Social Sciences": "SOE/SOSS",
-"School of Computing & Information Systems": "SCIS",
+"School of Economics/School of Computing & Information Systems 2": "SOE/SCIS2",
+"School of Computing & Information Systems 1": "SCIS1",
+"School of Social Sciences/College of Integrative Studies": "SOSS/CIS",
 "Yong Pung How School of Law/Kwa Geok Choo Law Library": ["YPHSL", "KGC"],
 "SMU Connexion": "SMUC",
 "Group Study Room": "GSR",
@@ -80,7 +84,7 @@ def start(update, context):
     markup = InlineKeyboardMarkup([[itembtna], [itembtna1], [itembtna2]])
     update.message.reply_text('Greetings! This bot can show you the available facilities in SMU now', reply_markup=ReplyKeyboardRemove())
     update.message.reply_text('Choose how you would want to search', reply_markup=markup)
-    database.fbs_logs.insert_one({'username': update.message.from_user.username, 'text': update.message.text, 'chat_id': update.message.chat_id, 'time': datetime.datetime.now().strftime("%H:%M:%S"), 'date': str(datetime.date.today())})
+    database.fbs_logs.insert_one({'username': update.message.from_user.username, 'text': update.message.text, 'chat_id': update.message.chat_id, 'time': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%H:%M:%S"), 'date': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")})
 
 def button(update, context):
     query = update.callback_query
@@ -108,7 +112,6 @@ def button(update, context):
         query.edit_message_text('select the building you want to include in your search', reply_markup=markup)
 
     if choose in list_school:
-        global_dict[chat_id][0].add(choose)
         markup_list = []
         global_dict[chat_id][0].add(choose)
         reply_msg = ' - ' + '\n - '.join(global_dict[chat_id][0])
@@ -128,7 +131,6 @@ def button(update, context):
         query.edit_message_text('select the facility you want to include in your search', reply_markup=markup)
 
     if choose in types_facilities:
-        global_dict[chat_id][1].add(choose)
         markup_list = []
         global_dict[chat_id][1].add(choose)
         reply_msg = ' - ' + '\n - '.join(global_dict[chat_id][1])
@@ -163,17 +165,17 @@ def button(update, context):
         reply_msg = read_fbs_data(start_time, global_dict[chat_id][0], global_dict[update.callback_query.message.chat_id][1])
         reply_long_msg(reply_msg, query, update, context)
 
-    database.fbs_logs.insert_one({'username': update.callback_query.message.from_user.username, 'text': choose, 'chat_id': chat_id, 'time': datetime.datetime.now().strftime("%H:%M:%S"), 'date': str(datetime.date.today())})
+    database.fbs_logs.insert_one({'username': update.callback_query.message.chat.username, 'text': choose, 'chat_id': chat_id, 'time': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%H:%M:%S"), 'date': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")})
 
 def help(update, context):
     """Send a message when the command /help is issued."""
     update.message.reply_text('Save time by using this bot instead of logging in to FBS to see which rooms are available.\n\nClick /start to get started.')
-    database.fbs_logs.insert_one({'username': update.message.from_user.username, 'text': update.message.text, 'chat_id': update.message.chat_id, 'time': datetime.datetime.now().strftime("%H:%M:%S"), 'date': str(datetime.date.today())})
+    database.fbs_logs.insert_one({'username': update.message.from_user.username, 'text': update.message.text, 'chat_id': update.message.chat_id, 'time': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%H:%M:%S"), 'date': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")})
 
 def echo(update, context):
     """Echo the user message."""
     update.message.reply_text(update.message.text)
-    database.fbs_logs.insert_one({'username': update.message.from_user.username, 'text': update.message.text, 'chat_id': update.message.chat_id, 'time': datetime.datetime.now().strftime("%H:%M:%S"), 'date': str(datetime.date.today())})
+    database.fbs_logs.insert_one({'username': update.message.from_user.username, 'text': update.message.text, 'chat_id': update.message.chat_id, 'time': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%H:%M:%S"), 'date': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")})
 
 def error(update, context):
     """Log Errors caused by Updates."""
