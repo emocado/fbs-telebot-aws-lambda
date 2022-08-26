@@ -172,6 +172,22 @@ def help(update, context):
     update.message.reply_text('Save time by using this bot instead of logging in to FBS to see which rooms are available.\n\nClick /start to get started.')
     database.fbs_logs.insert_one({'username': update.message.from_user.username, 'text': update.message.text, 'chat_id': update.message.chat_id, 'time': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%H:%M:%S"), 'date': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")})
 
+def book(update, context):
+    """Book fbs when the command /book is issued."""
+    update.message.reply_text('key in your school email, password, day, room, start time, end time, and co-booker in the following format:\n\njohn.2020@scis.smu.edu.sg, fakepassword123, Monday, SOE/SCIS2 GSR 2-7, 11:30AM, 3:30PM, alice.2020')
+
+def information(update, context):
+    """Book fbs when the command /book is issued."""
+    information_list = [element.strip() for element in update.message.text.split(',')]
+    if len(information_list) < 5:
+        update.message.reply_text('wrong format, please try again')
+        return
+    if len(information_list) == 7:
+        email, password, day, room, start_time, end_time, co_booker = information_list
+        database.schedule.update_one({'chat_id': update.message.chat_id}, {'$set': {'email': email, 'password': password, 'day': day.title(), 'room': room, 'start_time': start_time, 'end_time': end_time, 'co_booker': co_booker}}, upsert=True)
+        update.message.reply_text('information received')
+
+
 def echo(update, context):
     """Echo the user message."""
     update.message.reply_text(update.message.text)
@@ -297,11 +313,12 @@ def lambda_handler(event, context):
     
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help))
+    dispatcher.add_handler(CommandHandler("book", book))
     dispatcher.add_handler(CallbackQueryHandler(button))
-    dispatcher.add_handler(MessageHandler(Filters.text, echo))
+    dispatcher.add_handler(MessageHandler(Filters.text, information))
 
     # on noncommand i.e message - echo the message on Telegram
-    dispatcher.add_handler(MessageHandler(Filters.text, echo))
+    # dispatcher.add_handler(MessageHandler(Filters.text, echo))
 
     # log all errors
     dispatcher.add_error_handler(error)
