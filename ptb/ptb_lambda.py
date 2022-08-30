@@ -238,6 +238,9 @@ def reply_long_msg(reply_msg, query, update, context):
 def update_blocks_of_30mins(booking_time, blocks_of_30mins):
     # blocks_of_30mins = [True]*32
     start_time, end_time = booking_time.split('-')
+    if start_time == '00:00' and end_time == '00:00':
+        for i in range(len(blocks_of_30mins)):
+            blocks_of_30mins[i] = False
     if start_time == '00:00' or end_time == '00:00':
         return
 
@@ -294,6 +297,7 @@ def read_fbs_data(curr_time, building = set(), faci_type = set(), sort_by='room'
             if blocks_of_30mins[i]:
                 end_free_time = time_list[i]
             else:
+                end_free_time = time_list[i]
                 break
         if start_free_time:
             faci_message_list_of_tuple.append((faci, f"*{start_free_time} - {end_free_time}*"))
