@@ -236,13 +236,13 @@ def reply_long_msg(reply_msg, query, update, context):
             context.bot.send_message(update.effective_chat.id, msg, parse_mode='Markdown')
 
 def update_blocks_of_30mins(booking_time, blocks_of_30mins):
-    # blocks_of_30mins = [True]*32
+    # blocks_of_30mins = [True]*len(time_list)
     start_time, end_time = booking_time.split('-')
     if start_time == '00:00' and end_time == '00:00':
         for i in range(len(blocks_of_30mins)):
             blocks_of_30mins[i] = False
-    if start_time == '00:00' or end_time == '00:00':
-        return
+    if end_time == '00:00':
+        end_time = '23:59'
 
     if start_time not in time_list:
         # in case of start time is not in the list for eg. start time is 17:45
