@@ -184,7 +184,7 @@ def information(update, context):
         return
     if len(information_list) == 7:
         email, password, day, room, start_time, end_time, co_booker = information_list
-        database.schedule.update_one({'chat_id': update.message.chat_id}, {'$set': {'email': email, 'password': password, 'day': day.title(), 'room': room, 'start_time': start_time, 'end_time': end_time, 'co_booker': co_booker}}, upsert=True)
+        database.schedule.insert_one({'chat_id': update.message.chat_id, 'email': email, 'password': password, 'day': day.title(), 'room': room, 'start_time': start_time, 'end_time': end_time, 'co_booker': co_booker})
         update.message.reply_text('information received')
 
 
