@@ -3,7 +3,7 @@ import logging
 import re
 from pymongo import MongoClient
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, Update, Bot
-from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, Filters, Dispatcher
+from telegram.ext import CallbackQueryHandler, CommandHandler, ConversationHandler, MessageHandler, Filters, Dispatcher
 import json
 import os
 
@@ -176,6 +176,11 @@ def book(update, context):
     """Book fbs when the command /book is issued."""
     update.message.reply_text('key in your school email, password, day, room, start time, end time, and co-booker in the following format:\n\njohn.2020@scis.smu.edu.sg, fakepassword123, Monday, SOE/SCIS2 GSR 2-7, 11:30AM, 3:30PM, alice.2020')
 
+def schedules(update, context):
+    """Show schedules when the command /schedules is issued."""
+    update.message.reply_text("key in your school email")
+    return "email"
+
 def information(update, context):
     """Book fbs when the command /book is issued."""
     information_list = [element.strip() for element in update.message.text.split(',')]
@@ -187,6 +192,18 @@ def information(update, context):
         database.schedule.insert_one({'chat_id': update.message.chat_id, 'email': email, 'password': password, 'day': day.title(), 'room': room, 'start_time': start_time, 'end_time': end_time, 'co_booker': co_booker})
         update.message.reply_text('information received')
 
+def email(update, context):
+    """Show schedules of given email when the command /schedules is issued."""
+    email = update.message.text
+    message = "\n".join(f"{data['day']}, {data['room']}, {data['start_time']}, {data['end_time']}" for data in database.schedule.find({'email': email}))
+    update.message.reply_text(message)
+    return ConversationHandler.END
+
+def cancel(update, context):
+    """Cancel the conversation."""
+    chat_id = update.message.chat_id
+    bot.send_message(chat_id , text = "process canceled !")
+    return ConversationHandler.END
 
 def echo(update, context):
     """Echo the user message."""
@@ -314,7 +331,10 @@ def read_fbs_data(curr_time, building = set(), faci_type = set(), sort_by='room'
     return all_text
 
 def lambda_handler(event, context):
-    
+    CH = ConversationHandler(entry_points = [CommandHandler("schedules", schedules)],
+        states = {"email" : [MessageHandler(Filters.text , email)]},
+        fallbacks = [MessageHandler(Filters.regex('cancel'), cancel)])
+    dispatcher.add_handler(CH)
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help))
     dispatcher.add_handler(CommandHandler("book", book))
