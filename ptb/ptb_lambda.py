@@ -181,6 +181,25 @@ def schedules(update, context):
     update.message.reply_text("key in your school email")
     return "email"
 
+def cancel_schedule(update, context):
+    """Cancel scheduled bookings"""
+    update.message.reply_text("key in your school email")
+    return "email"
+
+def cancel_schedule_button(update, context):
+    """Cancel scheduled bookings"""
+    query = update.callback_query
+    query.answer()
+    chat_id = update.callback_query.message.chat_id
+    if query.data == 'cancel':
+        query.edit_message_text("process canceled !")
+        return ConversationHandler.END
+    schedule_data_to_delete = query.data
+    day, room, start_time, end_time = schedule_data_to_delete.split(', ')
+    database.schedule.delete_one({'day': day, 'room': room, 'start_time': start_time, 'end_time': end_time, 'chat_id': chat_id})
+    query.edit_message_text(f"Deleted schedule: {schedule_data_to_delete}")
+    return ConversationHandler.END
+
 def information(update, context):
     """Book fbs when the command /book is issued."""
     information_list = [element.strip() for element in update.message.text.split(',')]
@@ -195,9 +214,12 @@ def information(update, context):
 def email(update, context):
     """Show schedules of given email when the command /schedules is issued."""
     email = update.message.text
-    message = "\n".join(f"{data['day']}, {data['room']}, {data['start_time']}, {data['end_time']}" for data in database.schedule.find({'email': email}))
-    update.message.reply_text(message)
-    return ConversationHandler.END
+    schedule_list = [f"{data['day']}, {data['room']}, {data['start_time']}, {data['end_time']}" for data in database.schedule.find({'email': email})]
+    markup_list = [[InlineKeyboardButton(schedule, callback_data=schedule)] for schedule in schedule_list]
+    markup_list.append([InlineKeyboardButton('cancel', callback_data='cancel')])
+    markup = InlineKeyboardMarkup(markup_list)
+    update.message.reply_text("Here is your schedule bookings.\nIf you would like to remove any scheduling please click on the respective button below", reply_markup=markup)
+    return "cancel_schedule_button"
 
 def cancel(update, context):
     """Cancel the conversation."""
@@ -331,10 +353,14 @@ def read_fbs_data(curr_time, building = set(), faci_type = set(), sort_by='room'
     return all_text
 
 def lambda_handler(event, context):
-    CH = ConversationHandler(entry_points = [CommandHandler("schedules", schedules)],
-        states = {"email" : [MessageHandler(Filters.text , email)]},
+    schedules_CH = ConversationHandler(entry_points = [CommandHandler("schedules", schedules)],
+        states = {"email" : [MessageHandler(Filters.text , email)], "cancel_schedule_button" : [CallbackQueryHandler(cancel_schedule_button)]},
         fallbacks = [MessageHandler(Filters.regex('cancel'), cancel)])
-    dispatcher.add_handler(CH)
+    cancel_schedule_CH = ConversationHandler(entry_points = [CommandHandler("cancel_schedule", cancel_schedule)],
+        states = {"email" : [MessageHandler(Filters.text , email)], "cancel_schedule_button" : [CallbackQueryHandler(cancel_schedule_button)]},
+        fallbacks = [MessageHandler(Filters.regex('cancel'), cancel)])
+    dispatcher.add_handler(schedules_CH)
+    dispatcher.add_handler(cancel_schedule_CH)
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help))
     dispatcher.add_handler(CommandHandler("book", book))
