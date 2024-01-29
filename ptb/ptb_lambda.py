@@ -61,6 +61,16 @@ school_shortcut = {"Administration Building": "Admin",
 "Seminar Room": "Seminar Room",
 "Study Booth": "Study Booth"
 }
+def convertTo24Hour(time):
+    if time[-2:].upper() == "AM" and time[:2] == "12":
+        return "00" + time[2:-2]
+    elif time[-2:] == "AM":
+        return time[:-2]
+    elif time[-2:].upper() == "PM" and time[:2] == "12":
+        return time[:-2]
+    else:
+        return str(int(time[:2]) + 12) + time[2:8]
+
 def create_time_list():
     time_list = []
     for i in range(24):
@@ -196,8 +206,11 @@ def cancel_schedule_button(update, context):
         return ConversationHandler.END
     schedule_data_to_delete = query.data
     day, room, start_time, end_time = schedule_data_to_delete.split(', ')
-    database.schedule.delete_one({'day': day, 'room': room, 'start_time': start_time, 'end_time': end_time, 'chat_id': chat_id})
-    query.edit_message_text(f"Deleted schedule: {schedule_data_to_delete}")
+    delete_result = database.schedule.delete_one({'day': day, 'room': room, 'start_time': start_time, 'end_time': end_time, 'chat_id': chat_id})
+    if delete_result.deleted_count == 0:
+        query.edit_message_text(f"Failed to delete schedule: {schedule_data_to_delete}")
+    else:
+        query.edit_message_text(f"Deleted schedule: {schedule_data_to_delete}")
     return ConversationHandler.END
 
 def information(update, context):
@@ -208,7 +221,7 @@ def information(update, context):
         return
     if len(information_list) == 7:
         email, password, day, room, start_time, end_time, co_booker = information_list
-        database.schedule.insert_one({'chat_id': update.message.chat_id, 'email': email, 'password': password, 'day': day.title(), 'room': room, 'start_time': start_time, 'end_time': end_time, 'co_booker': co_booker})
+        database.schedule.insert_one({'chat_id': update.message.chat_id, 'email': email, 'password': password, 'day': day.title(), 'room': room, 'start_time': convertTo24Hour(start_time), 'end_time': convertTo24Hour(end_time), 'co_booker': co_booker})
         update.message.reply_text('information received')
 
 def email(update, context):
