@@ -61,15 +61,6 @@ school_shortcut = {"Administration Building": "Admin",
 "Seminar Room": "Seminar Room",
 "Study Booth": "Study Booth"
 }
-def convertTo24Hour(time):
-    if time[-2:].upper() == "AM" and time[:2] == "12":
-        return "00" + time[2:-2]
-    elif time[-2:] == "AM":
-        return time[:-2]
-    elif time[-2:].upper() == "PM" and time[:2] == "12":
-        return time[:-2]
-    else:
-        return str(int(time[:2]) + 12) + time[2:8]
 
 def create_time_list():
     time_list = []
@@ -92,7 +83,7 @@ def start(update, context):
     itembtna1 = InlineKeyboardButton('All facilities search (sort by time)', callback_data='sort by time')
     itembtna2 = InlineKeyboardButton('Advance Search', callback_data='Advance Search')
     markup = InlineKeyboardMarkup([[itembtna], [itembtna1], [itembtna2]])
-    update.message.reply_text('Greetings! This bot can show you the available facilities in SMU now', reply_markup=ReplyKeyboardRemove())
+    update.message.reply_text('Greetings! This bot can show you the available facilities in SMU now\n\nIf you trust this bot and the developer with your password you can try out fbs auto recurring booking (2 weeks in advance) here /book', reply_markup=ReplyKeyboardRemove())
     update.message.reply_text('Choose how you would want to search', reply_markup=markup)
     database.fbs_logs.insert_one({'username': update.message.from_user.username, 'text': update.message.text, 'chat_id': update.message.chat_id, 'time': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%H:%M:%S"), 'date': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")})
 
@@ -184,16 +175,33 @@ def help(update, context):
 
 def book(update, context):
     """Book fbs when the command /book is issued."""
-    update.message.reply_text('key in your school email, password, day, room, start time, end time, and co-booker in the following format:\n\njohn.2020@scis.smu.edu.sg, fakepassword123, Monday, SOE/SCIS2 GSR 2-7, 11:30AM, 3:30PM, alice.2020')
+    markup_list = []
+    keyboard_row = []
+    for school in list_school:
+        if len(keyboard_row) == 3:
+            markup_list.append(keyboard_row)
+            keyboard_row = []
+        school_short = school_shortcut[school]
+        if isinstance(school_short, list):
+            school_short = ' / '.join(school_short)
+        keyboard_row.append(InlineKeyboardButton(school_short, callback_data=school))
+    if keyboard_row:
+        markup_list.append(keyboard_row)
+    markup_list.append([InlineKeyboardButton('cancel', callback_data='cancel')])
+    markup = InlineKeyboardMarkup(markup_list)
+    update.message.reply_text('select the building you want to book', reply_markup=markup)
+    database.fbs_logs.insert_one({'username': update.message.from_user.username, 'text': update.message.text, 'chat_id': update.message.chat_id, 'time': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%H:%M:%S"), 'date': (datetime.datetime.now() + datetime.timedelta(hours=8)).strftime("%Y-%m-%d")})
+
+    return "building_info"
 
 def schedules(update, context):
     """Show schedules when the command /schedules is issued."""
-    update.message.reply_text("key in your school email")
+    update.message.reply_text("key in your school email. Eg: john.2023@scis.smu.edu.sg")
     return "email"
 
 def cancel_schedule(update, context):
     """Cancel scheduled bookings"""
-    update.message.reply_text("key in your school email")
+    update.message.reply_text("key in your school email. Eg: john.2023@scis.smu.edu.sg")
     return "email"
 
 def cancel_schedule_button(update, context):
@@ -213,16 +221,189 @@ def cancel_schedule_button(update, context):
         query.edit_message_text(f"Deleted schedule: {schedule_data_to_delete}")
     return ConversationHandler.END
 
-def information(update, context):
+def building_info(update, context):
     """Book fbs when the command /book is issued."""
-    information_list = [element.strip() for element in update.message.text.split(',')]
-    if len(information_list) < 5:
-        update.message.reply_text('wrong format, please try again')
-        return
-    if len(information_list) == 7:
-        email, password, day, room, start_time, end_time, co_booker = information_list
-        database.schedule.insert_one({'chat_id': update.message.chat_id, 'email': email, 'password': password, 'day': day.title(), 'room': room, 'start_time': convertTo24Hour(start_time), 'end_time': convertTo24Hour(end_time), 'co_booker': co_booker})
-        update.message.reply_text('information received')
+    query = update.callback_query
+    query.answer()
+    chat_id = update.callback_query.message.chat_id
+    if query.data == 'cancel':
+        query.edit_message_text("process canceled !")
+        return ConversationHandler.END
+    building = query.data
+    global_dict[chat_id] = {'building': building}
+    markup_list = []
+    keyboard_row = []
+    for faci_type in types_facilities:
+        if len(keyboard_row) == 3:
+            markup_list.append(keyboard_row)
+            keyboard_row = []
+        faci_type_short = school_shortcut[faci_type]
+        if isinstance(faci_type_short, list):
+            faci_type_short = ' / '.join(faci_type_short)
+        keyboard_row.append(InlineKeyboardButton(faci_type_short, callback_data=faci_type))
+    if keyboard_row:
+        markup_list.append(keyboard_row)
+    markup_list.append([InlineKeyboardButton('cancel', callback_data='cancel')])
+    markup = InlineKeyboardMarkup(markup_list)
+    query.edit_message_text('select the facility you want to book', reply_markup=markup)
+    return "facility_type_info"
+
+def facility_type_info(update, context):
+    """Book fbs when the command /book is issued."""
+    query = update.callback_query
+    query.answer()
+    chat_id = update.callback_query.message.chat_id
+    if query.data == 'cancel' or chat_id not in global_dict or 'building' not in global_dict[chat_id]:
+        query.edit_message_text("process canceled !")
+        return ConversationHandler.END
+    facility_type_short = school_shortcut[query.data]
+    if isinstance(facility_type_short, list):
+        facility_type_short = '|'.join(facility_type_short)
+    building_short = school_shortcut[global_dict[chat_id]['building']]
+    if isinstance(building_short, list):
+        building_short = '|'.join(building_short)
+    buildings_rgx = re.compile('.*' + building_short + '.*', re.IGNORECASE)
+    facilities_rgx = re.compile('.*' + facility_type_short + '.*', re.IGNORECASE)
+    print(buildings_rgx, facilities_rgx, building_short, facility_type_short)
+    filtered_facilities = database.facilities.find({'$and': [{'facility': buildings_rgx}, {'facility': facilities_rgx}]})
+    markup_list = []
+    keyboard_row = []
+    for obj in filtered_facilities:
+        if len(keyboard_row) == 3:
+            markup_list.append(keyboard_row)
+            keyboard_row = []
+        keyboard_row.append(InlineKeyboardButton(obj['facility'], callback_data=obj['facility']))
+    if keyboard_row:
+        markup_list.append(keyboard_row)
+    markup_list.append([InlineKeyboardButton('cancel', callback_data='cancel')])
+    markup = InlineKeyboardMarkup(markup_list)
+    query.edit_message_text('select the room you want to book', reply_markup=markup)
+    return "room_info"
+
+def book_room_info(update, context):
+    """Book fbs when the command /book is issued."""
+    query = update.callback_query
+    query.answer()
+    chat_id = update.callback_query.message.chat_id
+    if query.data == 'cancel' or chat_id not in global_dict:
+        query.edit_message_text("process canceled !")
+        return ConversationHandler.END
+    room = query.data
+    global_dict[chat_id]['room'] = room
+    markup_list = [
+        [InlineKeyboardButton('Monday', callback_data='Monday'), InlineKeyboardButton('Tuesday', callback_data='Tuesday'), InlineKeyboardButton('Wednesday', callback_data='Wednesday')],
+        [InlineKeyboardButton('Thursday', callback_data='Thursday'), InlineKeyboardButton('Friday', callback_data='Friday'), InlineKeyboardButton('Saturday', callback_data='Saturday')],
+        [InlineKeyboardButton('Sunday', callback_data='Sunday')],
+        [InlineKeyboardButton('cancel', callback_data='cancel')]
+    ]
+    markup = InlineKeyboardMarkup(markup_list)
+    query.edit_message_text('Choose day you want to book the room', reply_markup=markup)
+    return "day_info"
+
+def book_day_info(update, context):
+    """Book fbs when the command /book is issued."""
+    query = update.callback_query
+    query.answer()
+    chat_id = update.callback_query.message.chat_id
+    if query.data == 'cancel' or chat_id not in global_dict:
+        query.edit_message_text("process canceled !")
+        return ConversationHandler.END
+    day = query.data
+    global_dict[chat_id]['day'] = day
+    markup_list = [] 
+    time_list = create_time_list()[:-1]
+    keyboard_row = []
+    for time in time_list:
+        if len(keyboard_row) == 3:
+            markup_list.append(keyboard_row)
+            keyboard_row = []
+        keyboard_row.append(InlineKeyboardButton(time, callback_data=time))
+    if keyboard_row:
+        markup_list.append(keyboard_row)
+    markup_list.append([InlineKeyboardButton('cancel', callback_data='cancel')])
+    markup = InlineKeyboardMarkup(markup_list)
+    query.edit_message_text('Choose your start time', reply_markup=markup)
+    return "start_time_info"
+
+def book_start_time_info(update, context):
+    """Book fbs when the command /book is issued."""
+    query = update.callback_query
+    query.answer()
+    chat_id = update.callback_query.message.chat_id
+    if query.data == 'cancel' or chat_id not in global_dict:
+        query.edit_message_text("process canceled !")
+        return ConversationHandler.END
+    start_time = query.data
+    global_dict[chat_id]['start_time'] = start_time
+    markup_list = [] 
+    time_list = create_time_list()[1:]
+    keyboard_row = []
+    for time in time_list:
+        if len(keyboard_row) == 3:
+            markup_list.append(keyboard_row)
+            keyboard_row = []
+        keyboard_row.append(InlineKeyboardButton(time, callback_data=time))
+    if keyboard_row:
+        markup_list.append(keyboard_row)
+    markup_list.append([InlineKeyboardButton('cancel', callback_data='cancel')])
+    markup = InlineKeyboardMarkup(markup_list)
+    query.edit_message_text('Choose your end time', reply_markup=markup)
+    return "end_time_info"
+
+def book_end_time_info(update, context):
+    """Book fbs when the command /book is issued."""
+    query = update.callback_query
+    query.answer()
+    chat_id = update.callback_query.message.chat_id
+    if query.data == 'cancel' or chat_id not in global_dict:
+        query.edit_message_text("process canceled !")
+        return ConversationHandler.END
+    end_time = query.data
+    global_dict[chat_id]['end_time'] = end_time
+    query.edit_message_text('key in the co-booker. Eg: john.2023 or john.2023@scis.smu.edu.sg')
+    return "co_booker_info"
+
+def book_co_booker_info(update, context):
+    """Book fbs when the command /book is issued."""
+    chat_id = update.message.chat_id
+    co_booker = update.message.text
+    global_dict[chat_id]['co_booker'] = co_booker
+    update.message.reply_text('key in your school email. Eg: john.2023@scis.smu.edu.sg')
+    return "email_info"
+
+def book_email_info(update, context):
+    """Book fbs when the command /book is issued."""
+    chat_id = update.message.chat_id
+    email = update.message.text
+    global_dict[chat_id]['email'] = email
+    update.message.reply_text('key in your school password')
+    return "password_info"
+
+def book_password_info(update, context):
+    """Book fbs when the command /book is issued."""
+    chat_id = update.message.chat_id
+    password = update.message.text
+    global_dict[chat_id]['password'] = password
+    booking_info = global_dict[chat_id]
+    try:
+        insert_res = database.schedule.insert_one({
+            'chat_id': chat_id,
+            'email': booking_info['email'],
+            'password': booking_info['password'],
+            'day': booking_info['day'],
+            'room': booking_info['room'],
+            'start_time': booking_info['start_time'],
+            'end_time': booking_info['end_time'],
+            'co_booker': booking_info['co_booker']
+        })
+        if not insert_res.inserted_id:
+            raise Exception('Failed to insert booking')
+    except Exception as e:
+        update.message.reply_text(f'Booking failed: {e}')
+        return ConversationHandler.END
+    update.message.reply_text('Scheduled successfully!\n\nThis bot will help you to book the room 2 weeks in advance.\n\nYou can view and edit your bookings by clicking /schedules')
+    return ConversationHandler.END
+
 
 def email(update, context):
     """Show schedules of given email when the command /schedules is issued."""
@@ -366,19 +547,43 @@ def read_fbs_data(curr_time, building = set(), faci_type = set(), sort_by='room'
     return all_text
 
 def lambda_handler(event, context):
-    schedules_CH = ConversationHandler(entry_points = [CommandHandler("schedules", schedules)],
-        states = {"email" : [MessageHandler(Filters.text , email)], "cancel_schedule_button" : [CallbackQueryHandler(cancel_schedule_button)]},
-        fallbacks = [MessageHandler(Filters.regex('cancel'), cancel)])
-    cancel_schedule_CH = ConversationHandler(entry_points = [CommandHandler("cancel_schedule", cancel_schedule)],
-        states = {"email" : [MessageHandler(Filters.text , email)], "cancel_schedule_button" : [CallbackQueryHandler(cancel_schedule_button)]},
+    schedules_CH = ConversationHandler(
+        entry_points = [CommandHandler("schedules", schedules)],
+        states = {
+            "email" : [MessageHandler(Filters.text , email)],
+            "cancel_schedule_button" : [CallbackQueryHandler(cancel_schedule_button)]
+        },
+        fallbacks = [MessageHandler(Filters.regex('cancel'), cancel)]
+    )
+    cancel_schedule_CH = ConversationHandler(
+        entry_points = [CommandHandler("cancel_schedule", cancel_schedule)],
+        states = {
+            "email" : [MessageHandler(Filters.text , email)],
+            "cancel_schedule_button" : [CallbackQueryHandler(cancel_schedule_button)]
+        },
+        fallbacks = [MessageHandler(Filters.regex('cancel'), cancel)]
+    )
+    book_CH = ConversationHandler(
+        entry_points = [CommandHandler("book", book)],
+        states = {
+            "building_info" : [CallbackQueryHandler(building_info)],
+            "facility_type_info" : [CallbackQueryHandler(facility_type_info)],
+            "room_info" : [CallbackQueryHandler(book_room_info)],
+            "day_info" : [CallbackQueryHandler(book_day_info)],
+            "start_time_info" : [CallbackQueryHandler(book_start_time_info)],
+            "end_time_info" : [CallbackQueryHandler(book_end_time_info)],
+            "co_booker_info" : [MessageHandler(Filters.text, book_co_booker_info)],
+            "email_info" : [MessageHandler(Filters.text, book_email_info)],
+            "password_info" : [MessageHandler(Filters.text, book_password_info)]
+        },
         fallbacks = [MessageHandler(Filters.regex('cancel'), cancel)])
     dispatcher.add_handler(schedules_CH)
     dispatcher.add_handler(cancel_schedule_CH)
+    dispatcher.add_handler(book_CH)
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", help))
     dispatcher.add_handler(CommandHandler("book", book))
     dispatcher.add_handler(CallbackQueryHandler(button))
-    dispatcher.add_handler(MessageHandler(Filters.text, information))
 
     # on noncommand i.e message - echo the message on Telegram
     # dispatcher.add_handler(MessageHandler(Filters.text, echo))
