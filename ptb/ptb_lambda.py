@@ -62,6 +62,17 @@ school_shortcut = {"Administration Building": "Admin",
 "Study Booth": "Study Booth"
 }
 
+def create_bookable_time_list():
+    time_list = []
+    for i in range(8, 22):
+        if i < 10:
+            time_list.append('0' + str(i) + ':00')
+            time_list.append('0' + str(i) + ':30')
+        else:
+            time_list.append(str(i) + ':00')
+            time_list.append(str(i) + ':30')
+    return time_list
+
 def create_time_list():
     time_list = []
     for i in range(24):
@@ -272,7 +283,7 @@ def facility_type_info(update, context):
         if len(keyboard_row) == 3:
             markup_list.append(keyboard_row)
             keyboard_row = []
-        keyboard_row.append(InlineKeyboardButton(obj['facility'], callback_data=obj['facility']))
+        keyboard_row.append(InlineKeyboardButton(obj['facility'].split()[2], callback_data=obj['facility']))
     if keyboard_row:
         markup_list.append(keyboard_row)
     markup_list.append([InlineKeyboardButton('cancel', callback_data='cancel')])
@@ -311,7 +322,7 @@ def book_day_info(update, context):
     day = query.data
     global_dict[chat_id]['day'] = day
     markup_list = [] 
-    time_list = create_time_list()[:-1]
+    time_list = create_bookable_time_list()
     keyboard_row = []
     for time in time_list:
         if len(keyboard_row) == 3:
@@ -336,7 +347,7 @@ def book_start_time_info(update, context):
     start_time = query.data
     global_dict[chat_id]['start_time'] = start_time
     markup_list = [] 
-    time_list = create_time_list()[1:]
+    time_list = create_bookable_time_list()
     keyboard_row = []
     for time in time_list:
         if len(keyboard_row) == 3:
@@ -385,6 +396,7 @@ def book_password_info(update, context):
     password = update.message.text
     global_dict[chat_id]['password'] = password
     booking_info = global_dict[chat_id]
+    context.bot.delete_message(chat_id=chat_id, message_id=update.message.message_id)
     try:
         insert_res = database.schedule.insert_one({
             'chat_id': chat_id,
