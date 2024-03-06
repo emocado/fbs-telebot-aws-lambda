@@ -275,17 +275,8 @@ def facility_type_info(update, context):
         building_short = '|'.join(building_short)
     buildings_rgx = re.compile('.*' + building_short + '.*', re.IGNORECASE)
     facilities_rgx = re.compile('.*' + facility_type_short + '.*', re.IGNORECASE)
-    print(buildings_rgx, facilities_rgx, building_short, facility_type_short)
     filtered_facilities = database.facilities.find({'$and': [{'facility': buildings_rgx}, {'facility': facilities_rgx}]})
-    markup_list = []
-    keyboard_row = []
-    for obj in filtered_facilities:
-        if len(keyboard_row) == 3:
-            markup_list.append(keyboard_row)
-            keyboard_row = []
-        keyboard_row.append(InlineKeyboardButton(obj['facility'].split()[2], callback_data=obj['facility']))
-    if keyboard_row:
-        markup_list.append(keyboard_row)
+    markup_list = [[InlineKeyboardButton(obj['facility'].split(), callback_data=obj['facility'])] for obj in filtered_facilities]
     markup_list.append([InlineKeyboardButton('cancel', callback_data='cancel')])
     markup = InlineKeyboardMarkup(markup_list)
     query.edit_message_text('select the room you want to book', reply_markup=markup)
